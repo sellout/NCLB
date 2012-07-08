@@ -117,10 +117,10 @@ to compensate for that.
   (list *default-doc-format*
         (make-file-definition :names '("latex" "tex")
                               :extensions '("tex")
-                              :block-begin "\begin{code}"
-                              :block-end "\end{code}"
-                              :comment-begin "\begin{comment}"
-                              :comment-end "\end{comment}")))
+                              :block-begin "\\begin{verbatim}"
+                              :block-end "\\end{verbatim}"
+                              :comment-begin "\\begin{comment}"
+                              :comment-end "\\end{comment}")))
 
 (defun tangle (doc-stream code-stream doc-language)
   "Takes an input stream containing docs with code sections and an output
@@ -168,18 +168,22 @@ doc-language))))))
                 ((eq state 'doc)
                  (write-line (cat (single-line code-language) "@ " line) code-stream))
                 ((eq state 'skip)
-                 (write-line line code-stream))))))
+                 (write-line line code-stream))))
+    (first (extensions code-language))))
 
-(defun tangle-file
-    (doc-filename
-     &optional (code-filename (make-pathname :type "lisp"
-                                             :defaults doc-filename)))
+(defun tangle-file (doc-filename &optional code-filename)
   (with-open-file (in doc-filename)
-    (with-open-file (out code-filename :direction :output :if-exists :supersede)
-      (tangle in
-              out
-              (find (pathname-type doc-filename) *doc-file-definitions*
-                    :test (rcurry #'member :test #'string=) :key #'extensions)))))
+    (with-open-file (out (or code-filename
+                             (make-pathname :type "nclb" :defaults doc-filename))
+                         :direction :output :if-exists :supersede)
+      (let ((code-extension (tangle in
+                                    out
+                                    (find (pathname-type doc-filename) *doc-file-definitions*
+                                          :test (rcurry #'member :test #'string=) :key #'extensions))))
+        (unless code-filename
+          (rename-file out (make-pathname :type code-extension :defaults doc-filename)
+                       :if-exists :supersede)))
+      (truename out))))
 
 (defun weave (code-stream doc-stream code-language)
   "Takes an input stream containing code with literate comments and an output
@@ -219,60 +223,84 @@ doc-language))))))
                 ((eq state 'doc)
                  (write-line line doc-stream))
                 ((eq state 'skip)
-                 (write-line line doc-stream))))))
+                 (write-line line doc-stream))))
+    (first (extensions doc-language))))
 
-(defun weave-file
-    (code-filename
-     &optional (doc-filename (make-pathname :type "md"
-                                            :defaults code-filename)))
+(defun weave-file (code-filename &optional doc-filename)
   (with-open-file (in code-filename)
-    (with-open-file (out doc-filename :direction :output :if-exists :supersede)
-      (weave in
-             out
-             (find (pathname-type code-filename) *code-file-definitions*
-                   :test (rcurry #'member :test #'string=) :key #'extensions)))))
+    (with-open-file (out (or doc-filename
+                             (make-pathname :type "nclb" :defaults code-filename))
+                         :direction :output :if-exists :supersede)
+      (let ((doc-extension (weave in
+                                  out
+                                  (find (pathname-type code-filename) *code-file-definitions*
+                                        :test (rcurry #'member :test #'string=) :key #'extensions))))
+        (unless doc-filename
+          (rename-file out (make-pathname :type doc-extension :defaults code-filename)
+                       :if-exists :supersede)))
+      (truename out))))
 
 (defun weave-web (web-stream doc-stream path-name)
-  (loop for line = (read-line web-stream nil)
+  (let ((doc-extension))
+    (loop for line = (read-line web-stream nil)
        while line
-     do (let ((file-name (string-trim '(#\< #\>) line)))
-          (if (= 4 (- (length line) (length file-name)))
-              (let ((sub-file-name (merge-pathnames file-name path-name)))
-                (with-open-file (sub-file sub-file-name)
-                  (cond ((string= (pathname-type file-name) "web")
-                         (weave-web sub-file doc-stream sub-file-name))
-                        ((string= (pathname-type file-name) "lisp")
-                         (weave sub-file doc-stream
-                                (find (pathname-type sub-file-name)
-                                      *code-file-definitions*
-                                      :test (rcurry #'member :test #'string=)
-                                      :key #'extensions)))
-                        (t (loop for sub-line = (read-line sub-file nil)
-                              while sub-line
-                              do (write-line sub-line doc-stream))))))
-              (write-line line doc-stream)))))
+       do (let ((file-name (string-trim '(#\< #\>) line)))
+            (if (= 4 (- (length line) (length file-name)))
+                (let ((sub-file-name (merge-pathnames file-name path-name)))
+                  (with-open-file (sub-file sub-file-name)
+                    (cond ((string= (pathname-type file-name) "web")
+                           (weave-web sub-file doc-stream sub-file-name))
+                          ((member (pathname-type file-name) *code-file-definitions*
+                                   :test (rcurry #'member :test #'string=)
+                                   :key #'extensions)
+                           (let ((new-extension (weave sub-file doc-stream
+                                                       (find (pathname-type sub-file-name)
+                                                             *code-file-definitions*
+                                                             :test (rcurry #'member :test #'string=)
+                                                             :key #'extensions))))
+                             (if doc-extension
+                                 (unless (string= new-extension doc-extension)
+                                   (error "~A can not be woven into ~A"
+                                          sub-file path-name))
+                                 (setf doc-extension new-extension))))
+                          (t (if doc-extension
+                                 (unless (string= (pathname-type sub-file-name)
+                                                  doc-extension)
+                                   (error "~A can not be woven into ~A"
+                                          sub-file path-name)
+                                   (setf doc-extension (pathname-type sub-file-name))))
+                             (loop for sub-line = (read-line sub-file nil)
+                                while sub-line
+                                do (write-line sub-line doc-stream))))))
+                (write-line line doc-stream))))
+    doc-extension))
 
-(defun weave-web-file
-    (web-filename
-     &optional (doc-filename (make-pathname :type "md"
-                                            :defaults web-filename)))
+(defun weave-web-file (web-filename &optional doc-filename)
   (with-open-file (in web-filename)
-    (with-open-file (out doc-filename :direction :output :if-exists :supersede)
-      (weave-web in out web-filename))))
+    (with-open-file (out (or doc-filename
+                             (make-pathname :type "nclb" :defaults web-filename))
+                         :direction :output :if-exists :supersede)
+      (let ((doc-extension (weave-web in out web-filename)))
+        (unless doc-filename
+          (rename-file out (make-pathname :type doc-extension :defaults web-filename)
+                       :if-exists :supersede)))
+      (truename out))))
 
 (defun convert-file (in-filename &optional out-filename)
   "Since there is only one valid conversion from any given file, this function
    determines which one it is and performs it. If TANGLE and WEAVE form an
    isomorphism, this is a homomorphism."
-  (let ((out-file-type))
-    (funcall (cond ((string= (pathname-type in-filename) "web")
-                    (setf out-file-type "md")
-                    #'weave-web-file)
-                   ((string= (pathname-type in-filename) "md")
-                    (setf out-file-type "lisp")
-                    #'tangle-file)
-                   (t (setf out-file-type "md")
-                      #'weave-file))
-             in-filename
-             (or out-filename
-                 (make-pathname :type out-file-type :defaults in-filename)))))
+  (funcall (cond ((string= (pathname-type in-filename) "web")
+                  #'weave-web-file)
+                 ((find (pathname-type in-filename) *doc-file-definitions*
+                        :test (rcurry #'member :test #'string=)
+                        :key #'extensions)
+                  #'tangle-file)
+                 ((find (pathname-type in-filename) *code-file-definitions*
+                        :test (rcurry #'member :test #'string=)
+                        :key #'extensions)
+                  #'weave-file)
+                 (t (error "unknown file extension: ~A"
+                           (pathname-type in-filename))))
+           in-filename
+           out-filename))
