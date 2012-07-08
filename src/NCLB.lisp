@@ -56,6 +56,12 @@ Documentation for users of a system belong in a combination of docstrings and li
 Okay, so there _is_ a `tangle`, but it’s not used on the same original file. `tangle` converts valid documentation to valid code. There is still no “web” file, there are only code and documentation files. `weave` converts from code to documentation and `tangle` converts from documentation to code. At least in their current state, they are not isomorphic, but it does seem desirable that
 
 > tangle(weave(x)) = x
+
+However, there is some normalization that happens, so it is better to expect that
+
+> weave(tangle(weave(x))) = weave(x)
+
+to compensate for that.
 @|#
 
 (defun tangle (doc-stream code-stream)
