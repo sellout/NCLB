@@ -140,8 +140,6 @@ Okay, so there _is_ a `tangle`, but it’s not used on the same original file. `
           (if (= 4 (- (length line) (length file-name)))
               (let ((sub-file-name (merge-pathnames file-name path-name)))
                 (with-open-file (sub-file sub-file-name)
-                  ;; TODO: if the sub-file is also a web file, we should process
-                  ;;       it recursively.
                   (cond ((string= (pathname-type file-name) "web")
                          (weave-web sub-file doc-stream sub-file-name))
                         ((string= (pathname-type file-name) "lisp")
