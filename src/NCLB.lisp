@@ -132,3 +132,29 @@ Okay, so there _is_ a `tangle`, but it’s not used on the same original file. `
   (with-open-file (in code-filename)
     (with-open-file (out doc-filename :direction :output :if-exists :supersede)
       (weave in out))))
+
+(defun weave-web (web-stream doc-stream path-name)
+  (loop for line = (read-line web-stream nil)
+       while line
+     do (let ((file-name (string-trim '(#\< #\>) line)))
+          (if (= 4 (- (length line) (length file-name)))
+              (let ((sub-file-name (merge-pathnames file-name path-name)))
+                (with-open-file (sub-file sub-file-name)
+                  ;; TODO: if the sub-file is also a web file, we should process
+                  ;;       it recursively.
+                  (cond ((string= (pathname-type file-name) "web")
+                         (weave-web sub-file doc-stream sub-file-name))
+                        ((string= (pathname-type file-name) "lisp")
+                         (weave sub-file doc-stream))
+                        (t (loop for sub-line = (read-line sub-file nil)
+                              while sub-line
+                              do (write-line sub-line doc-stream))))))
+              (write-line line doc-stream)))))
+
+(defun weave-web-file
+    (web-filename
+     &optional (doc-filename (make-pathname :type "md"
+                                            :defaults web-filename)))
+  (with-open-file (in web-filename)
+    (with-open-file (out doc-filename :direction :output :if-exists :supersede)
+      (weave-web in out web-filename))))
