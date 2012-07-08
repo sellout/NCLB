@@ -1,0 +1,9 @@
+<!-- -*- mode: markdown -*- -->
+
+<<src/NCLB.lisp>>
+
+I lied about there being no “web” file, but you use them very rarely. They are used for document files that aggregate other files in cases where the document format doesn’t support inlining subdocuments. IE, Markdown needs a web file for aggregating, but LaTeχ does not.
+
+The syntax is very simple – it uses the same formatting as the subdocuments, with an added `<<foo/bar.md>>` syntax to include a file at a particular location. With LaTeχ, you would use `\input{foo/bar.tex}` or `\include{foo/bar.tex}` as appropriate, so no web file is necessary there.
+
+In fact, this file is generated from a web file, so it can pull in documentation from across the system to make a comprehensive README.
