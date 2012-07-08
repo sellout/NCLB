@@ -79,33 +79,94 @@ However, there is some normalization that happens, so it is better to expect tha
 to compensate for that.
 @|#
 
-(defun tangle (doc-stream code-stream)
+(defun cat (&rest arguments)
+  "Just an abbreviation."
+  (apply #'concatenate 'string arguments))
+
+(defstruct (file-definition (:conc-name nil))
+  (names)
+  (extensions)
+  (block-begin)
+  (block-end)
+  (single-line)
+  (comment-begin)
+  (comment-end))
+
+(defvar *code-file-definitions*
+  (list (make-file-definition :names '("c" "c++")
+                              :extensions '("c" "cpp" "C")
+                              :block-begin "/*"
+                              :block-end "*/"
+                              :single-line "//")
+        (make-file-definition :names '("lisp")
+                              :extensions '("lisp")
+                              :block-begin "#|"
+                              :block-end "|#"
+                              :single-line ";")))
+
+(defvar *default-doc-format*
+  (make-file-definition :names '("markdown")
+                        :extensions '("md" "markdown")
+                        :block-begin "```"
+                        :block-end "```"
+                        :single-line "> "
+                        :comment-begin "<!--"
+                        :comment-end "-->"))
+
+(defvar *doc-file-definitions*
+  (list *default-doc-format*
+        (make-file-definition :names '("latex" "tex")
+                              :extensions '("tex")
+                              :block-begin "\begin{code}"
+                              :block-end "\end{code}"
+                              :comment-begin "\begin{comment}"
+                              :comment-end "\end{comment}")))
+
+(defun tangle (doc-stream code-stream doc-language)
   "Takes an input stream containing docs with code sections and an output
    stream to write code to."
-  (let ((state 'doc))
+  (let* ((language-line (read-line doc-stream nil))
+         (code-language (find (subseq language-line
+                                      (1+ (length (comment-begin doc-language)))
+                                      (position #\Space language-line))
+                              *code-file-definitions*
+                              :test (rcurry #'member :test #'string=)
+                              :key #'names))
+         (state 'doc))
+    (unless (eq doc-language *default-doc-format*)
+      (write-line (cat (single-line code-language) "@" (first (names doc-language)))
+                  code-stream))
     (loop for line = (read-line doc-stream nil)
        while line
-       do (cond ((and (eq state 'doc) (string= line "```"))
+       do (cond ((and (eq state 'doc) (string= line (block-begin doc-language)))
                  (setf state 'code))
-                ((and (eq state 'code) (string= line "```"))
+                ((and (eq state 'code) (string= line (block-end doc-language)))
                  (setf state 'doc))
-                ((and (eq state 'doc) (string= line "<!--"))
-                 (write-line ";@" code-stream)
+                ((and (eq state 'doc)
+                      (string= line (comment-begin doc-language)))
+                 (write-line (cat (single-line code-language) "@")
+                             code-stream)
                  (setf state 'skip))
-                ((and (eq state 'skip) (string= line "-->"))
-                 (write-line ";@" code-stream)
+                ((and (eq state 'skip)
+                      (string= line (comment-end doc-language)))
+                 (write-line (cat (single-line code-language) "@")
+                             code-stream)
                  (setf state 'doc))
-                ((eq 0 (search "<!--" line))
-                 (write-line (concatenate 'string
-                                          ";@@"
-                                          (subseq line 4 (- (length line) 4)))
+                ((eq 0 (search (comment-begin doc-language) line))
+                 (write-line (cat (single-line code-language) "@@"
+                                  (subseq line
+                                          (length (comment-begin doc-language))
+                                          (- (length line)
+                                             (1+ (length (comment-end
+doc-language))))))
                              code-stream))
-                ;; ((eq 0 (search "> " line))
-                ;;  (write-line (subseq line 3) code-stream))
+                ;; ((eq 0 (search (single-line doc-language) line))
+                ;;  (write-line (subseq line (length (single-line doc-language))
+                ;;              code-stream))
                 ((eq state 'code)
                  (write-line line code-stream))
                 ((eq state 'doc)
-                 (write-line (concatenate 'string ";@ " line) code-stream))
+                 (write-line (cat (single-line code-language) "@ " line) code-stream))
                 ((eq state 'skip)
                  (write-line line code-stream))))))
 
@@ -115,32 +176,46 @@ to compensate for that.
                                              :defaults doc-filename)))
   (with-open-file (in doc-filename)
     (with-open-file (out code-filename :direction :output :if-exists :supersede)
-      (tangle in out))))
+      (tangle in
+              out
+              (find (pathname-type doc-filename) *doc-file-definitions*
+                    :test (rcurry #'member :test #'string=) :key #'extensions)))))
 
-(defun weave (code-stream doc-stream)
+(defun weave (code-stream doc-stream code-language)
   "Takes an input stream containing code with literate comments and an output
    stream to write documentation content to."
-  (let ((state 'code))
-    (write-line "<!--@lisp -->" doc-stream)
+  (let ((doc-language *default-doc-format*)
+        (state 'code))
+    (write-line (cat (comment-begin doc-language) "@" (first (names code-language))
+                     " " (comment-end doc-language))
+                doc-stream)
     (loop for line = (read-line code-stream nil)
        while line
-       do (cond ((and (eq state 'code) (string= line "#|@"))
+       do (cond ((and (eq state 'code)
+                      (string= line (cat (block-begin code-language) "@")))
                  (setf state 'doc))
-                ((and (eq state 'doc) (string= line "@|#"))
+                ((and (eq state 'doc)
+                      (string= line (cat "@" (block-end code-language))))
                  (setf state 'code))
-                ((and (eq state 'code) (string= line ";@"))
-                 (write-line "<!--" doc-stream)
+                ((and (eq state 'code)
+                      (string= line (cat (single-line code-language) "@")))
+                 (write-line (comment-begin doc-language) doc-stream)
                  (setf state 'skip))
-                ((and (eq state 'skip) (string= line ";@"))
-                 (write-line "-->" doc-stream)
+                ((and (eq state 'skip)
+                      (string= line (cat (single-line code-language) "@")))
+                 (write-line (comment-end doc-language) doc-stream)
                  (setf state 'code))
-                ((eq 0 (search ";@@ " line))
-                 (write-line (concatenate 'string "<!--" (subseq line 3) " -->")
+                ((eq 0 (search (cat (single-line code-language) "@@ ") line))
+                 (write-line (cat (comment-begin doc-language)
+                                  (subseq line
+                                          (+ 3 (length (single-line code-language))))
+                                  " " (comment-end doc-language))
                              doc-stream))
-                ((eq 0 (search ";@ " line))
-                 (write-line (subseq line 3) doc-stream))
+                ((eq 0 (search (cat (single-line code-language) "@ ") line))
+                 (write-line (subseq line (+ 2 (single-line code-language)))
+                             doc-stream))
                 ((eq state 'code)
-                 (write-line (concatenate 'string "> " line) doc-stream))
+                 (write-line (cat (single-line doc-language) line) doc-stream))
                 ((eq state 'doc)
                  (write-line line doc-stream))
                 ((eq state 'skip)
@@ -152,7 +227,10 @@ to compensate for that.
                                             :defaults code-filename)))
   (with-open-file (in code-filename)
     (with-open-file (out doc-filename :direction :output :if-exists :supersede)
-      (weave in out))))
+      (weave in
+             out
+             (find (pathname-type code-filename) *code-file-definitions*
+                   :test (rcurry #'member :test #'string=) :key #'extensions)))))
 
 (defun weave-web (web-stream doc-stream path-name)
   (loop for line = (read-line web-stream nil)
@@ -164,7 +242,11 @@ to compensate for that.
                   (cond ((string= (pathname-type file-name) "web")
                          (weave-web sub-file doc-stream sub-file-name))
                         ((string= (pathname-type file-name) "lisp")
-                         (weave sub-file doc-stream))
+                         (weave sub-file doc-stream
+                                (find (pathname-type sub-file-name)
+                                      *code-file-definitions*
+                                      :test (rcurry #'member :test #'string=)
+                                      :key #'extensions)))
                         (t (loop for sub-line = (read-line sub-file nil)
                               while sub-line
                               do (write-line sub-line doc-stream))))))
