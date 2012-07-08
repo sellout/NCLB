@@ -122,6 +122,16 @@ to compensate for that.
                               :comment-begin "\\begin{comment}"
                               :comment-end "\\end{comment}")))
 
+(defun find-definition (extension definition-list)
+  (find extension definition-list
+        :test (rcurry #'member :test #'string=) :key #'extensions))
+
+(defun find-doc-definition (extension)
+  (find-definition extension *doc-file-definitions*))
+
+(defun find-code-definition (extension)
+  (find-definition extension *code-file-definitions*))
+
 (defun tangle (doc-stream code-stream doc-language)
   "Takes an input stream containing docs with code sections and an output
    stream to write code to."
@@ -178,8 +188,7 @@ doc-language))))))
                          :direction :output :if-exists :supersede)
       (let ((code-extension (tangle in
                                     out
-                                    (find (pathname-type doc-filename) *doc-file-definitions*
-                                          :test (rcurry #'member :test #'string=) :key #'extensions))))
+                                    (find-doc-definition (pathname-type doc-filename)))))
         (unless code-filename
           (rename-file out (make-pathname :type code-extension :defaults doc-filename)
                        :if-exists :supersede)))
@@ -233,8 +242,7 @@ doc-language))))))
                          :direction :output :if-exists :supersede)
       (let ((doc-extension (weave in
                                   out
-                                  (find (pathname-type code-filename) *code-file-definitions*
-                                        :test (rcurry #'member :test #'string=) :key #'extensions))))
+                                  (find-code-definition (pathname-type code-filename)))))
         (unless doc-filename
           (rename-file out (make-pathname :type doc-extension :defaults code-filename)
                        :if-exists :supersede)))
@@ -250,14 +258,10 @@ doc-language))))))
                   (with-open-file (sub-file sub-file-name)
                     (cond ((string= (pathname-type file-name) "web")
                            (weave-web sub-file doc-stream sub-file-name))
-                          ((member (pathname-type file-name) *code-file-definitions*
-                                   :test (rcurry #'member :test #'string=)
-                                   :key #'extensions)
-                           (let ((new-extension (weave sub-file doc-stream
-                                                       (find (pathname-type sub-file-name)
-                                                             *code-file-definitions*
-                                                             :test (rcurry #'member :test #'string=)
-                                                             :key #'extensions))))
+                          ((find-code-definition (pathname-type file-name))
+                           (let ((new-extension (weave sub-file
+                                                       doc-stream
+                                                       (find-code-definition (pathname-type sub-file-name)))))
                              (if doc-extension
                                  (unless (string= new-extension doc-extension)
                                    (error "~A can not be woven into ~A"
@@ -292,13 +296,9 @@ doc-language))))))
    isomorphism, this is a homomorphism."
   (funcall (cond ((string= (pathname-type in-filename) "web")
                   #'weave-web-file)
-                 ((find (pathname-type in-filename) *doc-file-definitions*
-                        :test (rcurry #'member :test #'string=)
-                        :key #'extensions)
+                 ((find-doc-definition (pathname-type in-filename))
                   #'tangle-file)
-                 ((find (pathname-type in-filename) *code-file-definitions*
-                        :test (rcurry #'member :test #'string=)
-                        :key #'extensions)
+                 ((find-code-definition (pathname-type in-filename))
                   #'weave-file)
                  (t (error "unknown file extension: ~A"
                            (pathname-type in-filename))))
