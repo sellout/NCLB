@@ -10,7 +10,7 @@
   :group 'mmm-faces)
 
 (mmm-add-group
- 'lisp
+ 'nclb
  `((nclb-doc
     :submode markdown-mode
     :front "^#|@$"
@@ -34,4 +34,4 @@
     :include-front t
     :back "\n")))
 
-(add-to-list 'mmm-mode-ext-classes-alist '(nil "lisp" lisp))
+(add-to-list 'mmm-mode-ext-classes-alist '(nil "lisp" nclb))
