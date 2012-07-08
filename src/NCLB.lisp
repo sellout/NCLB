@@ -156,3 +156,20 @@ Okay, so there _is_ a `tangle`, but it’s not used on the same original file. `
   (with-open-file (in web-filename)
     (with-open-file (out doc-filename :direction :output :if-exists :supersede)
       (weave-web in out web-filename))))
+
+(defun convert-file (in-filename &optional out-filename)
+  "Since there is only one valid conversion from any given file, this function
+   determines which one it is and performs it. If TANGLE and WEAVE form an
+   isomorphism, this is a homomorphism."
+  (let ((out-file-type))
+    (funcall (cond ((string= (pathname-type in-filename) "web")
+                    (setf out-file-type "md")
+                    #'weave-web-file)
+                   ((string= (pathname-type in-filename) "md")
+                    (setf out-file-type "lisp")
+                    #'tangle-file)
+                   (t (setf out-file-type "md")
+                      #'weave-file))
+             in-filename
+             (or out-filename
+                 (make-pathname :type out-file-type :defaults in-filename)))))
