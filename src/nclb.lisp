@@ -78,7 +78,7 @@ However, there is some normalization that happens, so it is better to expect tha
 
 to compensate for that.
 @|#
-
+;@
 (defun cat (&rest arguments)
   "Just an abbreviation."
   (apply #'concatenate 'string arguments))
@@ -304,3 +304,4 @@ doc-language))))))
                            (pathname-type in-filename))))
            in-filename
            out-filename))
+;@
