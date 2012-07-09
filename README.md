@@ -5,7 +5,7 @@
 (in-package #:nclb)
 -->
 > 
-# Introduction
+## Introduction
 
 This is _NCLB_ (No Coder Left Behind), a literate programming system. It is
 less like _CWEB_ than anything I've seen. The _CWEB_ manual says “[w]riting

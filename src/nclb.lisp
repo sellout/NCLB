@@ -70,11 +70,11 @@ only code and documentation files. `weave` converts from code to documentation a
 `tangle` converts from documentation to code. At least in their current state, they
 are not isomorphic, but it does seem desirable that
 
-> tangle(weave(x)) = x
+    tangle(weave(x)) = x
 
 However, there is some normalization that happens, so it is better to expect that
 
-> tangle(weave(tangle(x))) = tangle(x)
+    tangle(weave(tangle(x))) = tangle(x)
 
 to compensate for that.
 @|#
@@ -109,7 +109,7 @@ to compensate for that.
                         :extensions '("md" "markdown")
                         :block-begin "```"
                         :block-end "```"
-                        :single-line "> "
+                        :single-line "    "
                         :comment-begin "<!--"
                         :comment-end "-->"))
 
