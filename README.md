@@ -111,8 +111,8 @@ to compensate for that.
                         :block-begin "```"
                         :block-end "```"
                         :single-line "    "
-                        :comment-begin "<!--"
-                        :comment-end "-->"))
+                        :comment-begin "&lt;!--"
+                        :comment-end "--&gt;"))
 
 (defvar *doc-file-definitions*
   (list *default-doc-format*
@@ -189,7 +189,8 @@ doc-language))))))
                          :direction :output :if-exists :supersede)
       (let ((code-extension (tangle in
                                     out
-                                    (find-doc-definition (pathname-type doc-filename)))))
+                                    (find-doc-definition (pathname-type
+doc-filename)))))
         (unless code-filename
           (rename-file out (make-pathname :type code-extension :defaults doc-filename)
                        :if-exists :supersede)))
@@ -243,7 +244,8 @@ doc-language))))))
                          :direction :output :if-exists :supersede)
       (let ((doc-extension (weave in
                                   out
-                                  (find-code-definition (pathname-type code-filename)))))
+                                  (find-code-definition (pathname-type
+code-filename)))))
         (unless doc-filename
           (rename-file out (make-pathname :type doc-extension :defaults code-filename)
                        :if-exists :supersede)))
@@ -262,7 +264,8 @@ doc-language))))))
                           ((find-code-definition (pathname-type file-name))
                            (let ((new-extension (weave sub-file
                                                        doc-stream
-                                                       (find-code-definition (pathname-type sub-file-name)))))
+                                                       (find-code-definition
+(pathname-type sub-file-name)))))
                              (if doc-extension
                                  (unless (string= new-extension doc-extension)
                                    (error "~A can not be woven into ~A"
@@ -307,8 +310,15 @@ doc-language))))))
            out-filename))
 -->
 
-I lied about there being no “web” file, but you use them very rarely. They are used for document files that aggregate other files in cases where the document format doesn’t support inlining subdocuments. IE, Markdown needs a web file for aggregating, but LaTeχ does not.
+I lied about there being no “web” file, but you use them very rarely. They are used for
+document files that aggregate other files in cases where the document format doesn’t
+support inlining subdocuments. IE, Markdown needs a web file for aggregating, but LaTeχ
+does not.
 
-The syntax is very simple – it uses the same formatting as the subdocuments, with an added `<<foo/bar.md>>` syntax to include a file at a particular location. With LaTeχ, you would use `\input{foo/bar.tex}` or `\include{foo/bar.tex}` as appropriate, so no web file is necessary there.
+The syntax is very simple – it uses the same formatting as the subdocuments, with an
+added `<<foo/bar.md>>` syntax to include a file at a particular location. With LaTeχ,
+you would use `\input{foo/bar.tex}` or `\include{foo/bar.tex}` as appropriate, so no
+web file is necessary there.
 
-In fact, this file is generated from a web file, so it can pull in documentation from across the system to make a comprehensive README.
+In fact, this file is generated from a web file, so it can pull in documentation from
+across the system to make a comprehensive README.
