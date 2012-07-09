@@ -8,7 +8,7 @@ language to generate source for.
 
 **Note**: I am using Markdown (HTML) comments here, because they are commonly
 understood. Replace `&lt;!--` and `--&gt;` with your documentation system’s comment
-block delimiters. And replace `\`\`\`` with your documentation system’s code block
+block delimiters. And replace (```) with your documentation system’s code block
 delimiters.
 
 Single-line code blocks (indicated by four spaces in Markdown) will be maintained as part of
@@ -17,9 +17,9 @@ to active code.
 
         this = descriptive_code;
     
-    \`\`\`
+    ```
     however_this = is_actual_code;
-    \`\`\`
+    ```
 
 When that is `tangled`, it becomes
 

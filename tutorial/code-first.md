@@ -30,15 +30,15 @@ The above section, when “woven” into Markdown, ends up looking like:
     ## Section Header
     The functions in this section do some stuff.
     
-    \`\`\`c
+    ```c
     int main(int, char**) {
-    \`\`\`
+    ```
     A single line of documentation in my function.
-    \`\`\`c
+    ```c
       // Regular comment on the code.
       do_stuff();
     }
-    \`\`\`
+    ```
 
 And when “tangled” back into C, it should look (pretty close to) the original
 section.
