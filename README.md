@@ -4,7 +4,7 @@
 <!--
 (in-package #:nclb)
 -->
-> 
+    
 # Introduction
 
 This is _NCLB_ (No Coder Left Behind), a literate programming system. It is
@@ -135,7 +135,8 @@ to compensate for that.
 
 (defun tangle (doc-stream code-stream doc-language)
   "Takes an input stream containing docs with code sections and an output
-   stream to write code to."
+   stream to write code to, as well as the struct containing the definitions for
+   the doc language used. It returns the code language that was used."
   (let* ((language-line (read-line doc-stream nil))
          (code-language (find (subseq language-line
                                       (1+ (length (comment-begin doc-language)))
@@ -180,28 +181,37 @@ doc-language))))))
                  (write-line (cat (single-line code-language) "@ " line) code-stream))
                 ((eq state 'skip)
                  (write-line line code-stream))))
-    (first (extensions code-language))))
+    code-language))
 
 (defun tangle-file (doc-filename &optional code-filename)
+  "Takes a documentation file to tangle into code, and optionally a code
+   filename to write to (by default it will use the same name as the
+   doc-filename with an appropriate file extension for the code language). It
+   returns the truename of the file written to."
   (with-open-file (in doc-filename)
     (with-open-file (out (or code-filename
                              (make-pathname :type "nclb" :defaults doc-filename))
                          :direction :output :if-exists :supersede)
-      (let ((code-extension (tangle in
-                                    out
-                                    (find-doc-definition (pathname-type
-doc-filename)))))
+      (let ((code-lang (tangle in
+                               out
+                               (find-doc-definition (pathname-type
+                                                     doc-filename)))))
         (unless code-filename
-          (rename-file out (make-pathname :type code-extension :defaults doc-filename)
+          (rename-file out
+                       (make-pathname :type (first (extensions code-lang))
+                                      :defaults doc-filename)
                        :if-exists :supersede)))
       (truename out))))
 
 (defun weave (code-stream doc-stream code-language)
   "Takes an input stream containing code with literate comments and an output
-   stream to write documentation content to."
+   stream to write documentation content to as well as the struct containing the
+   definitions for the code language used. It returns the doc language that was
+   used."
   (let ((doc-language *default-doc-format*)
         (state 'code))
-    (write-line (cat (comment-begin doc-language) "@" (first (names code-language))
+    (write-line (cat (comment-begin doc-language) "@"
+                     (first (names code-language))
                      " " (comment-end doc-language))
                 doc-stream)
     (loop for line = (read-line code-stream nil)
@@ -235,24 +245,34 @@ doc-filename)))))
                  (write-line line doc-stream))
                 ((eq state 'skip)
                  (write-line line doc-stream))))
-    (first (extensions doc-language))))
+    doc-language))
 
 (defun weave-file (code-filename &optional doc-filename)
+  "Takes a code file to weave into docs, and optionally a doc
+   filename to write to (by default it will use the same name as the
+   code-filename with an appropriate file extension for the doc language). It
+   returns the truename of the file written to."
   (with-open-file (in code-filename)
     (with-open-file (out (or doc-filename
-                             (make-pathname :type "nclb" :defaults code-filename))
+                             (make-pathname :type "nclb"
+                                            :defaults code-filename))
                          :direction :output :if-exists :supersede)
-      (let ((doc-extension (weave in
-                                  out
-                                  (find-code-definition (pathname-type
-code-filename)))))
+      (let ((doc-lang (weave in
+                             out
+                             (find-code-definition (pathname-type
+                                                    code-filename)))))
         (unless doc-filename
-          (rename-file out (make-pathname :type doc-extension :defaults code-filename)
+          (rename-file out
+                       (make-pathname :type (first (extensions doc-lang))
+                                      :defaults code-filename)
                        :if-exists :supersede)))
       (truename out))))
 
 (defun weave-web (web-stream doc-stream path-name)
-  (let ((doc-extension))
+  "Takes a stream containing web-formatted docs and a stream to write processed
+   docs to, as well as the base path name to use for all relative filenames in
+   the web-stream. Returns the document language used."
+  (let ((doc-lang))
     (loop for line = (read-line web-stream nil)
        while line
        do (let ((file-name (string-trim '(#\< #\>) line)))
@@ -262,35 +282,41 @@ code-filename)))))
                     (cond ((string= (pathname-type file-name) "web")
                            (weave-web sub-file doc-stream sub-file-name))
                           ((find-code-definition (pathname-type file-name))
-                           (let ((new-extension (weave sub-file
-                                                       doc-stream
-                                                       (find-code-definition
-(pathname-type sub-file-name)))))
-                             (if doc-extension
-                                 (unless (string= new-extension doc-extension)
+                           (let ((new-lang (weave sub-file
+                                                  doc-stream
+                                                  (find-code-definition
+                                                   (pathname-type sub-file-name)))))
+                             (if doc-lang
+                                 (unless (eq new-lang doc-lang)
                                    (error "~A can not be woven into ~A"
                                           sub-file path-name))
-                                 (setf doc-extension new-extension))))
-                          (t (if doc-extension
-                                 (unless (string= (pathname-type sub-file-name)
-                                                  doc-extension)
-                                   (error "~A can not be woven into ~A"
-                                          sub-file path-name)
-                                   (setf doc-extension (pathname-type sub-file-name))))
+                                 (setf doc-lang new-lang))))
+                          (t (let ((new-lang (find-doc-definition (pathname-type sub-file-name))))
+                               (if doc-lang
+                                   (unless (eq new-lang doc-lang)
+                                     (error "~A can not be woven into ~A"
+                                            sub-file path-name))
+                                   (setf doc-lang new-lang)))
                              (loop for sub-line = (read-line sub-file nil)
                                 while sub-line
                                 do (write-line sub-line doc-stream))))))
                 (write-line line doc-stream))))
-    doc-extension))
+    doc-lang))
 
 (defun weave-web-file (web-filename &optional doc-filename)
+  "Takes a web file to weave into docs, and optionally a doc
+   filename to write to (by default it will use the same name as the
+   web-filename with an appropriate file extension for the doc language). It
+   returns the truename of the file written to."
   (with-open-file (in web-filename)
     (with-open-file (out (or doc-filename
                              (make-pathname :type "nclb" :defaults web-filename))
                          :direction :output :if-exists :supersede)
-      (let ((doc-extension (weave-web in out web-filename)))
+      (let ((doc-lang (weave-web in out web-filename)))
         (unless doc-filename
-          (rename-file out (make-pathname :type doc-extension :defaults web-filename)
+          (rename-file out
+                       (make-pathname :type (first (extensions doc-lang))
+                                      :defaults web-filename)
                        :if-exists :supersede)))
       (truename out))))
 
@@ -310,15 +336,10 @@ code-filename)))))
            out-filename))
 -->
 
-I lied about there being no “web” file, but you use them very rarely. They are used for
-document files that aggregate other files in cases where the document format doesn’t
-support inlining subdocuments. IE, Markdown needs a web file for aggregating, but LaTeχ
-does not.
+I lied about there being no “web” file, but you use them very rarely. They are used for document files that aggregate other files in cases where the document format doesn’t support inlining subdocuments. IE, Markdown needs a web file for aggregating, but LaTeχ does not.
 
-The syntax is very simple – it uses the same formatting as the subdocuments, with an
-added `<<foo/bar.md>>` syntax to include a file at a particular location. With LaTeχ,
-you would use `\input{foo/bar.tex}` or `\include{foo/bar.tex}` as appropriate, so no
-web file is necessary there.
+The syntax is very simple – it uses the same formatting as the subdocuments, with an added `<<foo/bar.md>>` syntax to include a file at a particular location. With LaTeχ, you would use `\input{foo/bar.tex}` or `\include{foo/bar.tex}` as appropriate, so no web file is necessary there. Even in formats like Markdown, I would recommend using links instead of embedding when possible.
 
-In fact, this file is generated from a web file, so it can pull in documentation from
-across the system to make a comprehensive README.
+In fact, this file is generated from a web file, so it can pull in documentation from across the system to make a comprehensive README.
+
+Please also check out [the tutorial](tutorial/tutorial.md).
