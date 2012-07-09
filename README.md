@@ -5,7 +5,7 @@
 (in-package #:nclb)
 -->
 > 
-## Introduction
+# Introduction
 
 This is _NCLB_ (No Coder Left Behind), a literate programming system. It is
 less like _CWEB_ than anything I've seen. The _CWEB_ manual says “[w]riting
@@ -72,11 +72,11 @@ only code and documentation files. `weave` converts from code to documentation a
 `tangle` converts from documentation to code. At least in their current state, they
 are not isomorphic, but it does seem desirable that
 
-> tangle(weave(x)) = x
+    tangle(weave(x)) = x
 
 However, there is some normalization that happens, so it is better to expect that
 
-> tangle(weave(tangle(x))) = tangle(x)
+    tangle(weave(tangle(x))) = tangle(x)
 
 to compensate for that.
 <!--
@@ -110,7 +110,7 @@ to compensate for that.
                         :extensions '("md" "markdown")
                         :block-begin "```"
                         :block-end "```"
-                        :single-line "> "
+                        :single-line "    "
                         :comment-begin "<!--"
                         :comment-end "-->"))
 
@@ -189,8 +189,7 @@ doc-language))))))
                          :direction :output :if-exists :supersede)
       (let ((code-extension (tangle in
                                     out
-                                    (find-doc-definition (pathname-type
-doc-filename)))))
+                                    (find-doc-definition (pathname-type doc-filename)))))
         (unless code-filename
           (rename-file out (make-pathname :type code-extension :defaults doc-filename)
                        :if-exists :supersede)))
@@ -244,8 +243,7 @@ doc-filename)))))
                          :direction :output :if-exists :supersede)
       (let ((doc-extension (weave in
                                   out
-                                  (find-code-definition (pathname-type
-code-filename)))))
+                                  (find-code-definition (pathname-type code-filename)))))
         (unless doc-filename
           (rename-file out (make-pathname :type doc-extension :defaults code-filename)
                        :if-exists :supersede)))
@@ -264,8 +262,7 @@ code-filename)))))
                           ((find-code-definition (pathname-type file-name))
                            (let ((new-extension (weave sub-file
                                                        doc-stream
-                                                       (find-code-definition
-(pathname-type sub-file-name)))))
+                                                       (find-code-definition (pathname-type sub-file-name)))))
                              (if doc-extension
                                  (unless (string= new-extension doc-extension)
                                    (error "~A can not be woven into ~A"
@@ -276,8 +273,7 @@ code-filename)))))
                                                   doc-extension)
                                    (error "~A can not be woven into ~A"
                                           sub-file path-name)
-                                   (setf doc-extension (pathname-type
-sub-file-name))))
+                                   (setf doc-extension (pathname-type sub-file-name))))
                              (loop for sub-line = (read-line sub-file nil)
                                 while sub-line
                                 do (write-line sub-line doc-stream))))))
@@ -311,15 +307,8 @@ sub-file-name))))
            out-filename))
 -->
 
-I lied about there being no “web” file, but you use them very rarely. They are used
-for document files that aggregate other files in cases where the document format
-doesn’t support inlining subdocuments. IE, Markdown needs a web file for aggregating,
-but LaTeχ does not.
+I lied about there being no “web” file, but you use them very rarely. They are used for document files that aggregate other files in cases where the document format doesn’t support inlining subdocuments. IE, Markdown needs a web file for aggregating, but LaTeχ does not.
 
-The syntax is very simple – it uses the same formatting as the subdocuments, with an
-added `<<foo/bar.md>>` syntax to include a file at a particular location. With LaTeχ,
-you would use `\input{foo/bar.tex}` or `\include{foo/bar.tex}` as appropriate, so no
-web file is necessary there.
+The syntax is very simple – it uses the same formatting as the subdocuments, with an added `<<foo/bar.md>>` syntax to include a file at a particular location. With LaTeχ, you would use `\input{foo/bar.tex}` or `\include{foo/bar.tex}` as appropriate, so no web file is necessary there.
 
-In fact, this file is generated from a web file, so it can pull in documentation from
-across the system to make a comprehensive README.
+In fact, this file is generated from a web file, so it can pull in documentation from across the system to make a comprehensive README.
