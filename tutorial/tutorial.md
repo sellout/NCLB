@@ -9,7 +9,11 @@ Literate programming produces _developer_ documentation as opposed to user docum
 
 One of the problems with the *WEB class of literate systems is that there is both a
 high barrier to use and a high barrier to sharing. With *WEB systems, you write a
-`.web` file that wraps both code and documentation blocks in a third syntax. This
+`.web` file that wraps both code and documentation blocks in a third syntax.
+
+![](cweb.png)
+
+This
 means that before you can compile any code, you need to acquire, build and process
 your files with the literate system. They also use (La)Teχ exclusively as a
 documentation syntax – while this can be very attractive when made into a book, it is
@@ -28,7 +32,9 @@ Almost all NCLB documents can be written as either valid code files or valid
 documentation files, and freely converted between the two, with no files that can only
 be processed by the literate system. This means that neither the developer nor the
 users need to install the literate system at all – if you write in code-form, then
-everything will compilpe properly without pre-processing.
+everything will compile properly without pre-processing.
+
+![](nclb.png)
 
 Also, while it is possible to use NCLB with LaTeχ, by default it processes
 documentation as [Markdown](http://en.wikipedia.org/wiki/Markdown). This is both more
