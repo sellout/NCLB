@@ -132,7 +132,7 @@ to compensate for that.
 (defun find-code-definition (extension)
   (find-definition extension *code-file-definitions*))
 
-(defun tangle (doc-stream code-stream doc-language)
+(defun tangle (doc-stream code-stream doc-language &key reversiblep)
   "Takes an input stream containing docs with code sections and an output
    stream to write code to, as well as the struct containing the definitions for
    the doc language used. It returns the code language that was used."
@@ -164,55 +164,60 @@ to compensate for that.
                              code-stream)
                  (setf state 'doc))
                 ((eq 0 (search (comment-begin doc-language) line))
-                 (write-line (cat (single-line code-language) "@@"
-                                  (subseq line
-                                          (length (comment-begin doc-language))
-                                          (- (length line)
-                                             (1+ (length (comment-end
-doc-language))))))
-                             code-stream))
+                 (when reversiblep
+                   (write-line (cat (single-line code-language) "@@"
+                                    (subseq line
+                                            (length (comment-begin doc-language))
+                                            (- (length line)
+                                               (1+ (length (comment-end
+                                                            doc-language))))))
+                               code-stream)))
                 ;; ((eq 0 (search (single-line doc-language) line))
                 ;;  (write-line (subseq line (length (single-line doc-language))
                 ;;              code-stream))
                 ((eq state 'code)
                  (write-line line code-stream))
                 ((eq state 'doc)
-                 (write-line (cat (single-line code-language) "@ " line) code-stream))
+                 (when reversiblep
+                   (write-line (cat (single-line code-language) "@ " line)
+                               code-stream)))
                 ((eq state 'skip)
                  (write-line line code-stream))))
     code-language))
 
-(defun tangle-file (doc-filename &optional code-filename)
+(defun tangle-file (doc-filename &key output-filename reversiblep)
   "Takes a documentation file to tangle into code, and optionally a code
    filename to write to (by default it will use the same name as the
    doc-filename with an appropriate file extension for the code language). It
    returns the truename of the file written to."
   (with-open-file (in doc-filename)
-    (with-open-file (out (or code-filename
+    (with-open-file (out (or output-filename
                              (make-pathname :type "nclb" :defaults doc-filename))
                          :direction :output :if-exists :supersede)
       (let ((code-lang (tangle in
                                out
                                (find-doc-definition (pathname-type
-                                                     doc-filename)))))
-        (unless code-filename
+                                                     doc-filename))
+                               :reversiblep reversiblep)))
+        (unless output-filename
           (rename-file out
                        (make-pathname :type (first (extensions code-lang))
                                       :defaults doc-filename)
                        :if-exists :supersede)))
       (truename out))))
 
-(defun weave (code-stream doc-stream code-language)
+(defun weave (code-stream doc-stream code-language &key reversiblep)
   "Takes an input stream containing code with literate comments and an output
    stream to write documentation content to as well as the struct containing the
    definitions for the code language used. It returns the doc language that was
    used."
   (let ((doc-language *default-doc-format*)
         (state 'code))
-    (write-line (cat (comment-begin doc-language) "@"
-                     (first (names code-language))
-                     " " (comment-end doc-language))
-                doc-stream)
+    (when reversiblep
+      (write-line (cat (comment-begin doc-language) "@"
+                       (first (names code-language))
+                       " " (comment-end doc-language))
+                  doc-stream))
     (loop for line = (read-line code-stream nil)
        while line
        do (cond ((and (eq state 'code)
@@ -223,18 +228,21 @@ doc-language))))))
                  (setf state 'code))
                 ((and (eq state 'code)
                       (string= line (cat (single-line code-language) "@")))
-                 (write-line (comment-begin doc-language) doc-stream)
+                 (when reversiblep
+                   (write-line (comment-begin doc-language) doc-stream))
                  (setf state 'skip))
                 ((and (eq state 'skip)
                       (string= line (cat (single-line code-language) "@")))
-                 (write-line (comment-end doc-language) doc-stream)
+                 (when reversiblep
+                   (write-line (comment-end doc-language) doc-stream))
                  (setf state 'code))
                 ((eq 0 (search (cat (single-line code-language) "@@ ") line))
-                 (write-line (cat (comment-begin doc-language)
-                                  (subseq line
-                                          (+ 3 (length (single-line code-language))))
-                                  " " (comment-end doc-language))
-                             doc-stream))
+                 (when reversiblep
+                   (write-line (cat (comment-begin doc-language)
+                                    (subseq line
+                                            (+ 3 (length (single-line code-language))))
+                                    " " (comment-end doc-language))
+                               doc-stream)))
                 ((eq 0 (search (cat (single-line code-language) "@ ") line))
                  (write-line (subseq line (+ 2 (single-line code-language)))
                              doc-stream))
@@ -243,31 +251,33 @@ doc-language))))))
                 ((eq state 'doc)
                  (write-line line doc-stream))
                 ((eq state 'skip)
-                 (write-line line doc-stream))))
+                 (when reversiblep
+                   (write-line line doc-stream)))))
     doc-language))
 
-(defun weave-file (code-filename &optional doc-filename)
+(defun weave-file (code-filename &key output-filename reversiblep)
   "Takes a code file to weave into docs, and optionally a doc
    filename to write to (by default it will use the same name as the
    code-filename with an appropriate file extension for the doc language). It
    returns the truename of the file written to."
   (with-open-file (in code-filename)
-    (with-open-file (out (or doc-filename
+    (with-open-file (out (or output-filename
                              (make-pathname :type "nclb"
                                             :defaults code-filename))
                          :direction :output :if-exists :supersede)
       (let ((doc-lang (weave in
                              out
                              (find-code-definition (pathname-type
-                                                    code-filename)))))
-        (unless doc-filename
+                                                    code-filename))
+                             :reversiblep reversiblep)))
+        (unless output-filename
           (rename-file out
                        (make-pathname :type (first (extensions doc-lang))
                                       :defaults code-filename)
                        :if-exists :supersede)))
       (truename out))))
 
-(defun weave-web (web-stream doc-stream path-name)
+(defun weave-web (web-stream doc-stream path-name &key reversiblep)
   "Takes a stream containing web-formatted docs and a stream to write processed
    docs to, as well as the base path name to use for all relative filenames in
    the web-stream. Returns the document language used."
@@ -284,7 +294,8 @@ doc-language))))))
                            (let ((new-lang (weave sub-file
                                                   doc-stream
                                                   (find-code-definition
-                                                   (pathname-type sub-file-name)))))
+                                                   (pathname-type sub-file-name))
+                                                  :reversiblep reversiblep)))
                              (if doc-lang
                                  (unless (eq new-lang doc-lang)
                                    (error "~A can not be woven into ~A"
@@ -302,35 +313,36 @@ doc-language))))))
                 (write-line line doc-stream))))
     doc-lang))
 
-(defun weave-web-file (web-filename &optional doc-filename)
+(defun weave-web-file (web-filename &key output-filename reversiblep)
   "Takes a web file to weave into docs, and optionally a doc
    filename to write to (by default it will use the same name as the
    web-filename with an appropriate file extension for the doc language). It
    returns the truename of the file written to."
   (with-open-file (in web-filename)
-    (with-open-file (out (or doc-filename
+    (with-open-file (out (or output-filename
                              (make-pathname :type "nclb" :defaults web-filename))
                          :direction :output :if-exists :supersede)
-      (let ((doc-lang (weave-web in out web-filename)))
-        (unless doc-filename
+      (let ((doc-lang (weave-web in out web-filename :reversiblep reversiblep)))
+        (unless output-filename
           (rename-file out
                        (make-pathname :type (first (extensions doc-lang))
                                       :defaults web-filename)
                        :if-exists :supersede)))
       (truename out))))
 
-(defun convert-file (in-filename &optional out-filename)
+(defun convert-file (input-filename &key output-filename reversiblep)
   "Since there is only one valid conversion from any given file, this function
    determines which one it is and performs it. If TANGLE and WEAVE form an
    isomorphism, this is a homomorphism."
-  (funcall (cond ((string= (pathname-type in-filename) "web")
+  (funcall (cond ((string= (pathname-type input-filename) "web")
                   #'weave-web-file)
-                 ((find-doc-definition (pathname-type in-filename))
+                 ((find-doc-definition (pathname-type input-filename))
                   #'tangle-file)
-                 ((find-code-definition (pathname-type in-filename))
+                 ((find-code-definition (pathname-type input-filename))
                   #'weave-file)
                  (t (error "unknown file extension: ~A"
-                           (pathname-type in-filename))))
-           in-filename
-           out-filename))
+                           (pathname-type input-filename))))
+           input-filename
+           :output-filename output-filename
+           :reversiblep reversiblep))
 ;@
