@@ -89,6 +89,8 @@ to compensate for that.
   (block-begin)
   (block-end)
   (single-line)
+  (single-line-comment)
+  (single-line-comment-end "") ; NB: hack for Markdown
   (comment-begin)
   (comment-end))
 
@@ -110,6 +112,8 @@ to compensate for that.
                         :block-begin "```"
                         :block-end "```"
                         :single-line "    "
+                        :single-line-comment "<!--"
+                        :single-line-comment-end "-->"
                         :comment-begin "<!--"
                         :comment-end "-->"))
 
@@ -119,6 +123,7 @@ to compensate for that.
                               :extensions '("tex")
                               :block-begin "\\begin{verbatim}"
                               :block-end "\\end{verbatim}"
+                              :single-line-comment "%"
                               :comment-begin "\\begin{comment}"
                               :comment-end "\\end{comment}")))
 
@@ -217,9 +222,9 @@ to compensate for that.
     (flet ((%write-line (string stream)
              (when (and (not writtenp) reversiblep)
                (setf writtenp t)
-               (write-line (cat (comment-begin doc-language) "@"
+               (write-line (cat (single-line-comment doc-language) "@"
                                 (first (names code-language))
-                                " " (comment-end doc-language))
+                                " " (single-line-comment-end doc-language))
                            doc-stream))
              (write-line string stream)))
       (loop for line = (read-line code-stream nil)
