@@ -212,47 +212,62 @@ to compensate for that.
    definitions for the code language used. It returns the doc language that was
    used."
   (let ((doc-language *default-doc-format*)
-        (state 'code))
-    (when reversiblep
-      (write-line (cat (comment-begin doc-language) "@"
-                       (first (names code-language))
-                       " " (comment-end doc-language))
-                  doc-stream))
-    (loop for line = (read-line code-stream nil)
-       while line
-       do (cond ((and (eq state 'code)
-                      (string= line (cat (block-begin code-language) "@")))
-                 (setf state 'doc))
-                ((and (eq state 'doc)
-                      (string= line (cat "@" (block-end code-language))))
-                 (setf state 'code))
-                ((and (eq state 'code)
-                      (string= line (cat (single-line code-language) "@")))
-                 (when reversiblep
-                   (write-line (comment-begin doc-language) doc-stream))
-                 (setf state 'skip))
-                ((and (eq state 'skip)
-                      (string= line (cat (single-line code-language) "@")))
-                 (when reversiblep
-                   (write-line (comment-end doc-language) doc-stream))
-                 (setf state 'code))
-                ((eq 0 (search (cat (single-line code-language) "@@ ") line))
-                 (when reversiblep
-                   (write-line (cat (comment-begin doc-language)
-                                    (subseq line
-                                            (+ 3 (length (single-line code-language))))
-                                    " " (comment-end doc-language))
-                               doc-stream)))
-                ((eq 0 (search (cat (single-line code-language) "@ ") line))
-                 (write-line (subseq line (+ 2 (single-line code-language)))
-                             doc-stream))
-                ((eq state 'code)
-                 (write-line (cat (single-line doc-language) line) doc-stream))
-                ((eq state 'doc)
-                 (write-line line doc-stream))
-                ((eq state 'skip)
-                 (when reversiblep
-                   (write-line line doc-stream)))))
+        (state 'code)
+        (writtenp nil))
+    (flet ((%write-line (string stream)
+             (when (and (not writtenp) reversiblep)
+               (setf writtenp t)
+               (write-line (cat (comment-begin doc-language) "@"
+                                (first (names code-language))
+                                " " (comment-end doc-language))
+                           doc-stream))
+             (write-line string stream)))
+      (loop for line = (read-line code-stream nil)
+         while line
+         do (cond ((and (eq state 'code)
+                        (string= line (cat (block-begin code-language) "@")))
+                   (setf state 'doc))
+                  ((and (eq state 'doc)
+                        (string= line (cat "@" (block-end code-language))))
+                   (setf state 'code))
+                  ((and (eq state 'code)
+                        (string= line (cat (single-line code-language) "@")))
+                   (when reversiblep
+                     (%write-line (comment-begin doc-language) doc-stream))
+                   (setf state 'skip))
+                  ((and (eq state 'skip)
+                        (string= line (cat (single-line code-language) "@")))
+                   (when reversiblep
+                     (%write-line (comment-end doc-language) doc-stream))
+                   (setf state 'code))
+                  ((eq 0 (search (cat (single-line code-language) "@@ ") line))
+                   (when reversiblep
+                     (%write-line (cat (comment-begin doc-language)
+                                       (subseq line
+                                               (+ 3
+                                                  (length (single-line code-language))))
+                                       " " (comment-end doc-language))
+                                 doc-stream)))
+                  ((eq 0 (search (cat (single-line code-language) "@ ") line))
+                   (%write-line (subseq line
+                                        (+ 2
+                                           (length (single-line code-language))))
+                                doc-stream))
+                  ((eq 0 (search (cat (single-line code-language) "@") line))
+                   (setf doc-language
+                         (find (subseq line
+                                       (+ 1 (length (single-line code-language))))
+                               *doc-file-definitions*
+                               :test (rcurry #'member :test #'string=)
+                               :key #'names)))
+                  ((eq state 'code)
+                   (%write-line (cat (single-line doc-language) line)
+                                doc-stream))
+                  ((eq state 'doc)
+                   (%write-line line doc-stream))
+                  ((eq state 'skip)
+                   (when reversiblep
+                     (%write-line line doc-stream))))))
     doc-language))
 
 (defun weave-file (code-filename &key output-filename reversiblep)
