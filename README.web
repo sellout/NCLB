@@ -6,6 +6,10 @@ I lied about there being no “web” file, but you use them very rarely. They a
 
 The syntax is very simple – it uses the same formatting as the subdocuments, with an added `<<foo/bar.md>>` syntax to include a file at a particular location. With LaTeχ, you would use `\input{foo/bar.tex}` or `\include{foo/bar.tex}` as appropriate, so no web file is necessary there. Even in formats like Markdown, I would recommend using links instead of embedding when possible.
 
-In fact, this file is generated from a web file, so it can pull in documentation from across the system to make a comprehensive README.
+In fact, this file is generated from a web file, so it can pull in documentation from across the system to make a comprehensive README. The reasons for this are
+
+1. [Github](https://github.com/)’s README processing breaks relative links and
+2. it avoids having to keep generated versions of all files in the repo, just
+   to have the README work.
 
 Please also check out [the tutorial](tutorial/tutorial.md).
