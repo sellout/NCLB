@@ -125,7 +125,15 @@ to compensate for that.
                               :block-end "\\end{verbatim}"
                               :single-line-comment "%"
                               :comment-begin "\\begin{comment}"
-                              :comment-end "\\end{comment}")))
+                              :comment-end "\\end{comment}")
+        (make-file-definition :names '("org")
+                              :extensions '("org")
+                              :block-begin "#+BEGIN_SRC"
+                              :block-end "#+END_SRC"
+                              :single-line ": "
+                              :single-line-comment "#"
+                              :comment-begin "#+BEGIN_COMMENT"
+                              :comment-end "#+END_COMMENT")))
 
 (defun find-definition (extension definition-list)
   (find extension definition-list
